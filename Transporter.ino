@@ -14,7 +14,7 @@
  */
 
 #include "config.h"
-#include "motor_control.h"
+#include "motor_conf.h"
 #include "servo_lift.h"
 #include "display.h"
 #include "web_server_mgr.h"

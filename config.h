@@ -20,8 +20,7 @@
 #define SPIN_RIGHT     12
 #define TURN_LEFT      13
 #define TURN_RIGHT     14
-#define LIFT_UP        15
-#define LIFT_DOWN      16
+
 
 // Motor Index
 #define BACK_RIGHT_MOTOR 0
@@ -36,16 +35,39 @@
 #define MIN_MOTOR_SPEED   120
 
 // Pinout for Lifter and Servo
-#define LIFT_IN1      19    
-#define LIFT_IN2      5
-#define LIFT_ENA      18
+#define LIFT_IN1      3    
+#define LIFT_IN2      1
+#define LIFT_PWM      23
+
 #define SERVO_PIN_R   33
+
+// Shared Pin
+#define PIN_MOTOR_STBY 2
+
+// Pin IC 1
+#define PIN_FR_IN1    17
+#define PIN_FR_IN2    16
+#define PIN_FR_PWM    4
+
+#define PIN_FL_IN1    5
+#define PIN_FL_IN2    18
+#define PIN_FL_PWM    19
+
+// Pin IC 2
+#define PIN_BR_IN1    33
+#define PIN_BR_IN2    25
+#define PIN_BR_PWM    32
+
+#define PIN_BL_IN1    26
+#define PIN_BL_IN2    27
+#define PIN_BL_PWM    14
 
 // Motor Pin Struct
 struct MOTOR_PINS {
-  int pinIN1;
-  int pinIN2;
-  int pinEN;
+  int pinIN1;   // arah a
+  int pinIN2;   // arah b
+  int pinPWM;   // speed (PWM)
+  int pwmCh;    // ESP32 ledc channel 
 };
 
 extern std::vector<MOTOR_PINS> motorPins;
