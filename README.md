@@ -208,7 +208,7 @@ Cara mendapatkan MAC address PS3:
 
 ---
 
-## 🔧 Troubleshooting
+## 🔧 Troubleshooting Software Side
 
 **Motor tidak bergerak sama sekali**
 → Cek pin `PIN_MOTOR_STBY` — harus HIGH agar TB6612FNG aktif
@@ -217,7 +217,7 @@ Cara mendapatkan MAC address PS3:
 → MAC address belum di-set atau salah — buka Web Dashboard tab PS3
 
 **Web Dashboard tidak bisa diakses**
-→ Pastikan terhubung ke WiFi `WIRAGORA_2024`, bukan WiFi lain
+→ Pastikan terhubung ke WiFi dari ESP32, bukan WiFi lain
 
 **Kompilasi error `undefined reference to showXxx()`**
 → `display_oled.cpp` belum diimplementasi — lihat checklist di atas
