@@ -1,4 +1,4 @@
-# TransporterRobot
+# 🤖 TransporterRobot — WIRAGORA POLINDRA
 
 Robot transporter 4 roda mecanum berbasis **ESP32** dengan kendali **PS3 DualShock** via Bluetooth, motor driver **TB6612FNG**, dan konfigurasi via **Web Dashboard**.
 
@@ -10,11 +10,11 @@ Robot transporter 4 roda mecanum berbasis **ESP32** dengan kendali **PS3 DualSho
 Transporter/
 ├── Transporter.ino       # Main sketch — setup() & loop()
 ├── config.h              # Semua pin, konstanta, dan struct config
-├── motor_control.h/.cpp  # Kontrol 4 motor (TB6612FNG, brake mode)
-├── servo_lift.h/.cpp     # Servo gripper, lift motor, fan
+├── motor_conf.h/.cpp     # Kontrol 4 motor (TB6612FNG, brake mode)
+├── servo_lift.h/.cpp     # Servo gripper, lift motor
 ├── ps3_handler.h/.cpp    # PS3 input, button binding, Emergency Stop
 ├── web_server_mgr.h/.cpp # WiFi AP, Web Dashboard, config persistence
-└── display_oled.h/.cpp   # OLED SSD1306 display (⏳ in progress)
+└── display.h/.cpp        # OLED SSD1306 display
 ```
 
 ---
@@ -30,7 +30,7 @@ Transporter/
 | Servo | Standard servo × 1 (gripper) |
 | Display | OLED SSD1306 128×64 (I2C) |
 | Controller | PS3 DualShock (Bluetooth) |
-| Fan | DC fan PWM |
+| Buzzer | Passive buzzer |
 
 ### Pin Configuration
 
@@ -38,26 +38,26 @@ Semua pin didefinisikan di `config.h` — ubah di sini jika ada revisi hardware:
 
 ```cpp
 // STBY — shared untuk semua motor + lifter
-#define PIN_MOTOR_STBY   23
+#define PIN_MOTOR_STBY  2
 
 // IC1: FRONT_RIGHT (Ch.A) & FRONT_LEFT (Ch.B)
-#define PIN_FR_IN1  4    #define PIN_FL_IN1  0
-#define PIN_FR_IN2  17   #define PIN_FL_IN2  15
-#define PIN_FR_PWM  16   #define PIN_FL_PWM  2
+#define PIN_FR_IN1  17   #define PIN_FL_IN1  5
+#define PIN_FR_IN2  16   #define PIN_FL_IN2  18
+#define PIN_FR_PWM  4    #define PIN_FL_PWM  19
 
 // IC2: BACK_RIGHT (Ch.A) & BACK_LEFT (Ch.B)
-#define PIN_BR_IN1  13   #define PIN_BL_IN1  27
-#define PIN_BR_IN2  14   #define PIN_BL_IN2  25
-#define PIN_BR_PWM  12   #define PIN_BL_PWM  26
+#define PIN_BR_IN1  33   #define PIN_BL_IN1  26
+#define PIN_BR_IN2  25   #define PIN_BL_IN2  27
+#define PIN_BR_PWM  32   #define PIN_BL_PWM  14
 
 // Lifter
-#define PIN_LIFT_IN1  19
-#define PIN_LIFT_IN2  5
-#define PIN_LIFT_PWM  18
+#define LIFT_IN1  3
+#define LIFT_IN2  1
+#define LIFT_PWM  23
 
 // Peripheral
-#define PIN_SERVO_R  33
-#define PIN_FAN      32
+#define SERVO_PIN_R  33
+#define BUZZER_PIN   0   // ⚠️ placeholder — sesuaikan dengan skematik
 ```
 
 ---
@@ -90,26 +90,20 @@ Buka **Sketch → Include Library → Manage Libraries**, lalu install:
 
 ### 3. Library Manual (tidak tersedia di Library Manager)
 
-#### PS3 Controller Library by JVPernis
+#### PS3 Controller Library (PS3_Controller_Host — patched)
 
-Library ini tidak tersedia di Library Manager dan harus diinstall manual via GitHub.
+Library ini sudah di-patch manual untuk kompatibilitas dengan ESP32 Arduino core terbaru dan tersedia di repo project ini.
 
 **Langkah instalasi:**
+1. Copy folder `PS3_Controller_Host` dari repo ke direktori libraries Arduino:
+   ```
+   Windows : C:\Users\<nama>\Documents\Arduino\libraries\
+   macOS   : ~/Documents/Arduino/libraries/
+   Linux   : ~/Arduino/libraries/
+   ```
+2. Atau via Arduino IDE: **Sketch → Include Library → Add .ZIP Library**
 
-```bash
-# 1. Clone repository
-git clone https://github.com/jvpernis/esp32-ps3.git
-
-# 2. Pindahkan folder ke direktori libraries Arduino
-#    Windows : C:\Users\<nama>\Documents\Arduino\libraries\
-#    macOS   : ~/Documents/Arduino/libraries/
-#    Linux   : ~/Arduino/libraries/
-```
-
-Atau via Arduino IDE:
-1. Download ZIP dari https://github.com/jvpernis/esp32-ps3
-2. **Sketch → Include Library → Add .ZIP Library**
-3. Pilih file ZIP yang sudah didownload
+> ⚠️ Jangan install `PS3_Controller_Host` dari sumber lain — gunakan versi yang sudah di-patch di repo ini karena versi original tidak kompatibel dengan ESP32 core 3.x.
 
 ### 4. Library Built-in (tidak perlu install)
 
@@ -136,12 +130,10 @@ Library berikut sudah tersedia otomatis bersama ESP32 board package:
 | L1 | Lift turun |
 | ✕ (Cross) | Gripper tutup |
 | □ (Square) | Gripper buka |
-| ○ (Circle) | Fan ON (manual mode) |
-| △ (Triangle) | Display: info anggota tim |
+| △ (Triangle) | Buzzer beep |
 | D-Pad | Gerak alternatif (maju/mundur/putar) |
-| START | Display: nama tim |
-| SELECT | Display: logo tim (scroll) |
-| PS Button | Display: status baterai |
+| SELECT | Tampilkan logo |
+| PS Button | Tampilkan status baterai |
 | **L3 + R3** | ⛔ **Emergency Stop** |
 | Gerak stick | ✅ Resume dari Emergency Stop |
 
@@ -163,7 +155,6 @@ Setelah ESP32 menyala, hubungkan ke WiFi:
 |---|---|
 | ⚙️ Motor | Base / Min / Max speed per motor individual |
 | 🦾 Servo & Lift | Open/close angle gripper, speed lift up/down, test langsung |
-| 💨 Fan | PWM value, auto mode (nyala otomatis saat robot bergerak) |
 | 📺 Display | Brightness, contrast, font size, upload custom logo BMP |
 | 🎮 PS3 | Set MAC address controller, status koneksi live |
 | 🔧 System | Emergency Stop, Restart ESP32, Factory Reset |
@@ -191,7 +182,7 @@ Cara mendapatkan MAC address PS3:
 | Flash Frequency | 80MHz |
 | Flash Mode | QIO |
 | Flash Size | 4MB (32Mb) |
-| Partition Scheme | Default 4MB with spiffs |
+| Partition Scheme | **Huge APP (3MB No OTA/1MB SPIFFS)** |
 | PSRAM | Disabled |
 | Port | (sesuai port ESP32 di PC) |
 
@@ -199,16 +190,15 @@ Cara mendapatkan MAC address PS3:
 
 ## 📋 Checklist Sebelum Upload
 
-- [X] Semua library sudah terinstall
-- [X] Board setting sudah sesuai tabel di atas
-- [X] MAC address PS3 sudah diset (bisa via WebServer setelah upload)
-- [X] `display.h/.cpp` sudah diimplementasi dan di uncomment
-- [X] Pin di `config.h` sudah sesuai dengan skema hardware
-- [X] TB6612FNG STBY terhubung ke `PIN_MOTOR_STBY` (GPIO 23)
+- [ ] Semua library sudah terinstall (gunakan PS3_Controller_Host yang sudah di-patch dari repo)
+- [ ] Board setting sudah sesuai tabel di atas — pastikan **Partition Scheme: Huge APP**
+- [ ] MAC address PS3 sudah diset (bisa via WebServer setelah upload)
+- [ ] `BUZZER_PIN` di `config.h` sudah disesuaikan dengan skematik
+- [ ] Pin di `config.h` sudah sesuai dengan skema hardware
 
 ---
 
-## 🔧 Troubleshooting Software Side
+## 🔧 Troubleshooting
 
 **Motor tidak bergerak sama sekali**
 → Cek pin `PIN_MOTOR_STBY` — harus HIGH agar TB6612FNG aktif
@@ -217,10 +207,12 @@ Cara mendapatkan MAC address PS3:
 → MAC address belum di-set atau salah — buka Web Dashboard tab PS3
 
 **Web Dashboard tidak bisa diakses**
-→ Pastikan terhubung ke WiFi dari ESP32, bukan WiFi lain
+→ Pastikan terhubung ke WiFi `Transporter 17`, bukan WiFi lain
 
-**Kompilasi error `undefined reference to showXxx()`**
-→ `display_oled.cpp` belum diimplementasi — lihat checklist di atas
+**Sketch terlalu besar saat compile**
+→ Pastikan Partition Scheme di Arduino IDE sudah diset ke **Huge APP (3MB No OTA/1MB SPIFFS)**
+
+**Error compile library PS3**
+→ Pastikan menggunakan `PS3_Controller_Host` yang sudah di-patch dari repo ini, bukan versi original dari jvpernis
 
 ---
-
