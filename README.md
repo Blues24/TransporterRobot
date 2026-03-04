@@ -202,7 +202,7 @@ Cara mendapatkan MAC address PS3:
 - [X] Semua library sudah terinstall
 - [X] Board setting sudah sesuai tabel di atas
 - [X] MAC address PS3 sudah diset (bisa via WebServer setelah upload)
-- [ ] `display.h/.cpp` sudah diimplementasi → uncomment baris display di `Transporter.ino` dan `ps3_handler.cpp`
+- [X] `display.h/.cpp` sudah diimplementasi dan di uncomment
 - [X] Pin di `config.h` sudah sesuai dengan skema hardware
 - [X] TB6612FNG STBY terhubung ke `PIN_MOTOR_STBY` (GPIO 23)
 
