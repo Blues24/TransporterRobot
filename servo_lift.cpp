@@ -1,4 +1,5 @@
 #include "servo_lift.h"
+#include "config.h"
 #include <Preferences.h>
 
 // ============================================================
@@ -9,7 +10,7 @@ static Preferences servoPrefs;
 
 ServoConfig servoConfig = { 50, 150, 15 };
 LiftConfig  liftConfig  = { 200, 200 };
-FanConfig   fanConfig   = { 200, false };
+
 
 // ============================================================
 //  SETUP
@@ -23,7 +24,7 @@ void servoLiftSetup() {
 
   // Servo gripper
   myServoR.setPeriodHertz(50);
-  myServoR.attach(PIN_SERVO_R, 400, 2500);
+  myServoR.attach(SERVO_PIN_R, 400, 2500);
   myServoR.write(80);
 
   // Lifter motor pins (TB6612FNG — IN1, IN2, PWM)
@@ -31,12 +32,10 @@ void servoLiftSetup() {
   pinMode(PIN_LIFT_IN1, OUTPUT);
   pinMode(PIN_LIFT_IN2, OUTPUT);
   ledcAttachChannel(PIN_LIFT_PWM, PWM_FREQ, PWM_RESOLUTION, PWM_CH_LIFT);
-
-  // Fan
-  ledcAttachChannel(PIN_FAN, 25000, PWM_RESOLUTION, PWM_CH_FAN);
+  ledcAttachChannel(BUZZER_PIN, 2000, PWM_RESOLUTION, BUZZER_PWM_CH);
+  ledcWrite(BUZZER_PIN, 0);
 
   liftStop();
-  ledcWrite(PIN_FAN, 0);
 }
 
 // ============================================================
@@ -83,8 +82,7 @@ void loadServoConfig() {
   servoConfig.servoSpeed = servoPrefs.getInt("servoSpeed", 15);
   liftConfig.speedUp     = servoPrefs.getInt("liftUp",     200);
   liftConfig.speedDown   = servoPrefs.getInt("liftDown",   200);
-  fanConfig.pwmValue     = servoPrefs.getInt("fanPwm",     200);
-  fanConfig.autoMode     = servoPrefs.getBool("fanAuto",   false);
+  
   servoPrefs.end();
 }
 
@@ -95,7 +93,6 @@ void saveServoConfig() {
   servoPrefs.putInt("servoSpeed", servoConfig.servoSpeed);
   servoPrefs.putInt("liftUp",     liftConfig.speedUp);
   servoPrefs.putInt("liftDown",   liftConfig.speedDown);
-  servoPrefs.putInt("fanPwm",     fanConfig.pwmValue);
-  servoPrefs.putBool("fanAuto",   fanConfig.autoMode);
+  
   servoPrefs.end();
 }

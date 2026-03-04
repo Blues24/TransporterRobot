@@ -2,7 +2,7 @@
 #define PS3_HANDLER_H
 
 #include "config.h"
-#include <Ps3Controller.h>
+#include "Ps3Controller.h"
 
 // ============================================================
 //  SETUP - panggil di setup()

@@ -1,14 +1,14 @@
 #include "ps3_handler.h"
 #include "motor_conf.h"
 #include "servo_lift.h"
-#include "display.h"
+#include "display.h"  
 #include <Preferences.h>
 
 // ============================================================
 //  GLOBAL CONFIG & STATE
 // ============================================================
-Ps3Config       ps3Config    = { "2c:81:58:2f:26:a9" };
-volatile bool   eStopActive  = false;  // Emergency Stop state
+Ps3Config       ps3Config   = { "2c:81:58:2f:26:a9" };
+volatile bool   eStopActive = false;
 
 static Preferences ps3Prefs;
 
@@ -47,30 +47,19 @@ static void getBattInfo(int status, int& level, String& msg) {
 
 // ============================================================
 //  EMERGENCY STOP
-//
-//  Trigger : L3 + R3 ditekan bersamaan
-//  Resume  : stick analog digerakkan (threshold > 20)
-//
-//  Saat E-Stop aktif:
-//    - motorStandby(false) → STBY LOW → semua motor + lifter mati
-//    - Servo & fan tidak terpengaruh (tidak terhubung ke STBY)
-//    - Display tampilkan peringatan
-//    - Semua input PS3 diabaikan kecuali deteksi resume
 // ============================================================
 static void triggerEStop() {
-  if (eStopActive) return;  // sudah aktif, jangan trigger ulang
+  if (eStopActive) return;
   eStopActive = true;
-  motorStandby(false);      // STBY LOW — semua motor + lifter mati seketika
-  liftStop();               // pastikan lifter IN1/IN2 juga dalam state brake
-  ledcWrite(PIN_FAN, 0);    // matikan fan juga
+  motorStandby(false);    // STBY LOW — semua motor + lifter mati
+  liftStop();
   Serial.println("[ESTOP] ⚠ Emergency Stop AKTIF");
-  showEStop(true);          // tampilkan peringatan di OLED
+  showEStop(true);     // ⏳ uncomment jika display sudah siap
 }
 
 static void checkEStopResume() {
   if (!eStopActive) return;
 
-  // Cek apakah ada input stick analog yang signifikan
   const int lx = Ps3.data.analog.stick.lx;
   const int ly = Ps3.data.analog.stick.ly;
   const int rx = Ps3.data.analog.stick.rx;
@@ -79,41 +68,52 @@ static void checkEStopResume() {
   // Threshold 20 untuk hindari drift stick
   const bool stickMoved = abs(lx) > 20 || abs(ly) > 20 ||
                           abs(rx) > 20 || abs(ry) > 20;
-
   if (stickMoved) {
     eStopActive = false;
-    motorStandby(true);     // STBY HIGH — motor aktif kembali
+    motorStandby(true);   // STBY HIGH — motor aktif kembali
     Serial.println("[ESTOP] ✓ Resume — motor aktif");
-    showEStop(false);       // hapus peringatan dari OLED
+    showEStop(false);  // ⏳ uncomment jika display sudah siap
   }
 }
 
+
 // ============================================================
-//  SUB-HANDLER: Display & tombol aksi
+//  BUZZER
+//  Aktifkan setelah BUZZER_PIN ditentukan di config.h:
+//  1. Ganti XX di #define BUZZER_PIN
+//  2. Uncomment ledcAttachChannel di servo_lift.cpp
+//  3. Uncomment fungsi di bawah ini
+// ============================================================
+static void buzzerBeep(int durationMs = 100) {
+  ledcWrite(BUZZER_PIN, 128);       // 50% duty cycle = volume penuh
+  delay(durationMs);                // ⚠️ blocking — ganti millis() jika perlu
+  ledcWrite(BUZZER_PIN, 0);
+}
+
+static void buzzerOff() {
+  ledcWrite(BUZZER_PIN, 0);
+}
+
+// ============================================================
+//  SUB-HANDLER: Tombol aksi
 // ============================================================
 static void handleButtons() {
   // Servo gripper
   if      (Ps3.data.button.cross)  servoClose();
   else if (Ps3.data.button.square) servoOpen();
 
-  // Fan (manual mode)
-  if (!fanConfig.autoMode) {
-    ledcWrite(PIN_FAN, Ps3.data.button.circle ? fanConfig.pwmValue : 0);
-  }
+  // Buzzer — △ (Triangle)
+  if (Ps3.event.button_down.triangle) buzzerBeep(100);  // beep 100ms saat tekan
+  
+  if (Ps3.event.button_up.triangle)   buzzerOff();      // matikan saat lepas
 
-  // Display — event-based (single press via button_down)
-  if (Ps3.data.button.triangle)      showMemberTeam();
-  if (Ps3.event.button_down.ps)      { int lv; String msg; getBattInfo(Ps3.data.status.battery, lv, msg); showBattStatus(lv, msg); }
-  if (Ps3.event.button_down.start)   showNameTeam();
-  if (Ps3.event.button_down.select)  {
-    showLogoTeam();
-    extern volatile bool logoScrollActive;
-    extern unsigned long logoScrollTimer;
-    extern bool          logoScrollRight;
-    logoScrollActive = true;
-    logoScrollRight  = true;
-    logoScrollTimer  = millis();
+  if (Ps3.event.button_down.ps) {
+     int lv; String msg;
+     getBattInfo(Ps3.data.status.battery, lv, msg);
+     showBattStatus(lv, msg);
   }
+  if (Ps3.event.button_down.select) showLogo();  // static, tidak ada scroll
+
 }
 
 // ============================================================
@@ -127,13 +127,11 @@ static void handleMovement() {
   const int r2 = Ps3.data.analog.button.r2;
   const int l2 = Ps3.data.analog.button.l2;
 
-  // Kalkulasi kecepatan motor
   int speed = motorConfigs[0].baseSpeed;
   if (r2 > 0) speed += (motorConfigs[0].maxSpeed - speed) * r2 / 255;
   if (l2 > 0) speed -= (speed - motorConfigs[0].minSpeed) * l2 / 255;
   speed = constrain(speed, motorConfigs[0].minSpeed, motorConfigs[0].maxSpeed);
 
-  // Tentukan arah
   int dir = STOP;
   if      (ry > -63 && ry <  63 && rx < -60) dir = RIGHT_2;
   else if (ry > -63 && ry <  63 && rx >  60) dir = LEFT_2;
@@ -152,19 +150,13 @@ static void handleMovement() {
   else if (Ps3.data.button.right)            dir = SPIN_LEFT;
   else if (Ps3.data.button.left)             dir = SPIN_RIGHT;
 
-  // Offset kecepatan per manuver
   int s = speed;
-  if (dir == RIGHT_2  || dir == LEFT_2)              s = speed - 40;
-  if (dir == TURN_LEFT || dir == TURN_RIGHT)          s = speed - 25;
-  if (dir == SPIN_LEFT || dir == SPIN_RIGHT)          s = speed - 30;
+  if (dir == RIGHT_2   || dir == LEFT_2)           s = speed - 40;
+  if (dir == TURN_LEFT || dir == TURN_RIGHT)        s = speed - 25;
+  if (dir == SPIN_LEFT || dir == SPIN_RIGHT)        s = speed - 30;
 
   processCarMovement(dir, s);
 
-  // Fan auto mode
-  robotMoving = (dir != STOP);
-  if (fanConfig.autoMode) {
-    ledcWrite(PIN_FAN, robotMoving ? fanConfig.pwmValue : 0);
-  }
 }
 
 // ============================================================
@@ -180,21 +172,18 @@ static void handleLift() {
 //  MAIN NOTIFY CALLBACK
 // ============================================================
 void ps3Notify() {
-  // ── Cek Emergency Stop trigger (L3 + R3) ─────────────────
-  const bool l3 = Ps3.data.button.l3;
-  const bool r3 = Ps3.data.button.r3;
-
-  if (l3 && r3) {
+  // ── Emergency Stop: L3 + R3 ──────────────────────────────
+  if (Ps3.data.button.l3 && Ps3.data.button.r3) {
     triggerEStop();
     lastRecvTime = millis();
-    return;  // abaikan semua input lain saat E-Stop di-trigger
+    return;
   }
 
-  // ── Jika E-Stop sedang aktif: cek resume, lalu return ────
+  // ── Jika E-Stop aktif: hanya cek resume ──────────────────
   if (eStopActive) {
     checkEStopResume();
     lastRecvTime = millis();
-    return;  // blokir semua input motor/lift selama E-Stop
+    return;
   }
 
   // ── Normal operation ──────────────────────────────────────
@@ -214,10 +203,8 @@ void ps3OnConnect() {
 }
 
 void ps3OnDisconnect() {
-  // Matikan semua via STBY — paling cepat dan paling aman
   motorStandby(false);
   liftStop();
-  ledcWrite(PIN_FAN, 0);
   Serial.println("[PS3] Disconnected. Restarting...");
   ESP.restart();
 }

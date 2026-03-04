@@ -1,11 +1,11 @@
-#ifdef MOTOR_CONF_H
+#ifndef MOTOR_CONF_H
 #define MOTOR_CONF_H
 
 #include "config.h"
 
 // Motor Init
 void motorSetup();
-
+void motorStandby(bool active);
 // Kontrol Motor Utama
 
 /**

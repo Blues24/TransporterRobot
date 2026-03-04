@@ -34,12 +34,21 @@
 #define MAX_MOTOR_SPEED   255
 #define MIN_MOTOR_SPEED   120
 
-// Pinout for Lifter and Servo
-#define LIFT_IN1      3    
-#define LIFT_IN2      1
-#define LIFT_PWM      23
+// Pinout for Lifter 
+#define PIN_LIFT_IN1      3    
+#define PIN_LIFT_IN2      1
+#define PIN_LIFT_PWM      23
 
+// Utility Pins and PWM  Channel
 #define SERVO_PIN_R   33
+#define BUZZER_PIN    0
+
+#define BUZZER_PWM_CH 6
+#define PWM_CH_FR     0
+#define PWM_CH_FL     1
+#define PWM_CH_BR     2
+#define PWM_CH_BL     3
+#define PWM_CH_LIFT   4
 
 // Shared Pin
 #define PIN_MOTOR_STBY 2

@@ -1,5 +1,5 @@
 #include "motor_conf.h"
-
+#include "config.h"
 // Definisi Global 
 
 std::vector<MOTOR_PINS> motorPins = {
@@ -26,12 +26,7 @@ void motorSetup(){
   for (size_t i = 0; i < motorPins.size(); i++){
     pinMode(motorPins[i].pinIN1, OUTPUT);
     pinMode(motorPins[i].pinIN2, OUTPUT);
-    ledAttachChannel(
-                     motorPins[i].pinPWM,
-                     PWM_FREQ,
-                     PWM_RESOLUTION
-                     motorPins.pwmCh
-                     );
+    ledcAttachChannel(motorPins[i].pinPWM, PWM_FREQ, PWM_RESOLUTION, motorPins[i].pwmCh);
     // Stop motor
     rotateMotor(i, 0);
   }

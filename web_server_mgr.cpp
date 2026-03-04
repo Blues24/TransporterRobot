@@ -1,6 +1,7 @@
 #include "web_server_mgr.h"
 #include "servo_lift.h"
-#include "display_oled.h"
+#include "display.h"
+#include "motor_conf.h"
 #include "ps3_handler.h"
 #include <Preferences.h>
 
@@ -60,7 +61,7 @@ static const char HTML[] PROGMEM = R"rawliteral(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WIRAGORA Config</title>
+<title>Transporter Config</title>
 <style>
   :root{--blue:#007bff;--orange:#ff9800;--green:#4caf50;--red:#e53935;--purple:#9c27b0;--teal:#00897b;--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#e6edf3;--sub:#8b949e}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -125,7 +126,7 @@ static const char HTML[] PROGMEM = R"rawliteral(
 <header>
   <span style="font-size:1.8rem">🤖</span>
   <div>
-    <h1>WIRAGORA Control Panel</h1>
+    <h1>Transporter Control Panel</h1>
     <span style="font-size:.75rem;color:var(--sub)">ESP32 Robot Configuration Dashboard</span>
   </div>
   <span class="badge" id="connBadge">ONLINE</span>
@@ -134,7 +135,6 @@ static const char HTML[] PROGMEM = R"rawliteral(
 <div class="tabs">
   <div class="tab active" onclick="showTab('motor')">⚙️ Motor</div>
   <div class="tab" onclick="showTab('servo')">🦾 Servo & Lift</div>
-  <div class="tab" onclick="showTab('fan')">💨 Fan</div>
   <div class="tab" onclick="showTab('display')">📺 Display</div>
   <div class="tab" onclick="showTab('ps3')">🎮 PS3</div>
   <div class="tab" onclick="showTab('system')">🔧 System</div>
@@ -184,29 +184,6 @@ static const char HTML[] PROGMEM = R"rawliteral(
     </div>
   </div>
   <button class="btn btn-primary btn-block" onclick="saveServo()">💾 Save Servo & Lift Config</button>
-</div>
-
-<!-- ═══ TAB: FAN ═══ -->
-<div id="tab-fan" class="page">
-  <div class="section">
-    <div class="section-title" style="color:var(--teal)">💨 Fan Control</div>
-    <div class="grid grid-2">
-      <div class="field">
-        <label>PWM Value (kecepatan fan) &nbsp;<span class="range-val" id="fanPwmVal">200</span></label>
-        <input type="range" id="fanPwm" min="0" max="255" value="200" oninput="document.getElementById('fanPwmVal').textContent=this.value">
-      </div>
-      <div class="field" style="display:flex;align-items:center;gap:12px;padding-top:20px">
-        <label style="margin:0">Auto Mode (nyala saat robot bergerak)</label>
-        <label class="toggle"><input type="checkbox" id="fanAuto"><span class="slider-t"></span></label>
-      </div>
-    </div>
-    <hr>
-    <div class="btn-group">
-      <button class="btn btn-success" onclick="fanCtrl('on')">✅ Test Fan ON</button>
-      <button class="btn btn-danger"  onclick="fanCtrl('off')">⛔ Fan OFF</button>
-    </div>
-  </div>
-  <button class="btn btn-primary btn-block" onclick="saveFan()">💾 Save Fan Config</button>
 </div>
 
 <!-- ═══ TAB: DISPLAY ═══ -->
@@ -354,9 +331,6 @@ function loadAll() {
     setVal('servoSpeed', d.servoSpeed);
     setRange('liftSpeedUp', 'liftUpVal', d.liftSpeedUp);
     setRange('liftSpeedDown','liftDownVal',d.liftSpeedDown);
-    // Fan
-    setRange('fanPwm','fanPwmVal',d.fanPwm);
-    document.getElementById('fanAuto').checked = !!d.fanAuto;
     // Display
     setRange('brightness','brightVal',d.brightness);
     setRange('contrast','contrastVal',d.contrast);
@@ -398,14 +372,6 @@ function saveServo() {
   postJson('/api/servo', data).then(r=>toast(r.success?'✅ Servo & Lift saved!':'❌ '+r.message, r.success));
 }
 
-function saveFan() {
-  const data = {
-    fanPwm: +document.getElementById('fanPwm').value,
-    fanAuto: document.getElementById('fanAuto').checked ? 1 : 0,
-  };
-  postJson('/api/fan', data).then(r=>toast(r.success?'✅ Fan config saved!':'❌ '+r.message, r.success));
-}
-
 function saveDisplay() {
   const data = {
     brightness:  +document.getElementById('brightness').value,
@@ -432,10 +398,6 @@ function servoCtrl(cmd) {
 function liftCtrl(cmd) {
   fetch('/api/lift/'+cmd,{method:'POST'}).then(r=>r.json()).then(r=>toast(r.message,r.success));
 }
-function fanCtrl(cmd) {
-  fetch('/api/fan/'+cmd,{method:'POST'}).then(r=>r.json()).then(r=>toast(r.message,r.success));
-}
-
 // ─── System actions ──────────────────────────────────────────
 function sysAction(action) {
   if(action==='restart' && !confirm('Restart ESP32 sekarang?')) return;
@@ -532,8 +494,6 @@ static void handleConfigGet() {
   j+=",\"servoSpeed\":"   +String(servoConfig.servoSpeed);
   j+=",\"liftSpeedUp\":"  +String(liftConfig.speedUp);
   j+=",\"liftSpeedDown\":"+String(liftConfig.speedDown);
-  j+=",\"fanPwm\":"       +String(fanConfig.pwmValue);
-  j+=",\"fanAuto\":"      +String(fanConfig.autoMode?1:0);
   j+=",\"brightness\":"   +String(displayConfig.brightness);
   j+=",\"contrast\":"     +String(displayConfig.contrast);
   j+=",\"displayMode\":"  +String(displayConfig.displayMode);
@@ -565,15 +525,6 @@ static void handleServoPost() {
   liftConfig.speedUp     =parseJsonInt(j,"liftSpeedUp",   liftConfig.speedUp);
   liftConfig.speedDown   =parseJsonInt(j,"liftSpeedDown", liftConfig.speedDown);
   saveServoConfig();
-  server.send(200,"application/json","{\"success\":true}");
-}
-
-static void handleFanPost() {
-  if(!server.hasArg("plain")){server.send(400,"application/json","{\"success\":false}");return;}
-  const String& j=server.arg("plain");
-  fanConfig.pwmValue=parseJsonInt(j,"fanPwm",  fanConfig.pwmValue);
-  fanConfig.autoMode=parseJsonInt(j,"fanAuto", fanConfig.autoMode?1:0)==1;
-  saveServoConfig(); // fan disimpan bersama servo namespace
   server.send(200,"application/json","{\"success\":true}");
 }
 
@@ -618,9 +569,6 @@ static void handleLiftUp()   { liftUp(liftConfig.speedUp);     server.send(200,"
 static void handleLiftDown() { liftDown(liftConfig.speedDown); server.send(200,"application/json","{\"success\":true,\"message\":\"Lift DOWN\"}"); }
 static void handleLiftStop() { liftStop();                     server.send(200,"application/json","{\"success\":true,\"message\":\"Lift STOP\"}"); }
 
-static void handleFanOn()  { ledcWrite(FAN_PIN,fanConfig.pwmValue); server.send(200,"application/json","{\"success\":true,\"message\":\"Fan ON\"}"); }
-static void handleFanOff() { ledcWrite(FAN_PIN,0);                  server.send(200,"application/json","{\"success\":true,\"message\":\"Fan OFF\"}"); }
-
 
 static void handleEStop() {
   extern volatile bool eStopActive;
@@ -629,7 +577,6 @@ static void handleEStop() {
   eStopActive = true;
   motorStandby(false);
   liftStop();
-  ledcWrite(PIN_FAN, 0);
   showEStop(true);
   Serial.println("[WEB] E-Stop triggered via WebServer");
   server.send(200, "application/json", "{\"success\":true,\"message\":\"⛔ Emergency Stop aktif!\"}");
@@ -685,7 +632,6 @@ void webServerSetup() {
   server.on("/api/config",  HTTP_GET,  handleConfigGet);
   server.on("/api/motor",   HTTP_POST, handleMotorPost);
   server.on("/api/servo",   HTTP_POST, handleServoPost);
-  server.on("/api/fan",     HTTP_POST, handleFanPost);
   server.on("/api/display", HTTP_POST, handleDisplayPost);
   server.on("/api/display/logo", HTTP_POST, handleLogoPost);
   server.on("/api/ps3mac",  HTTP_POST, handlePs3MacPost);
@@ -694,8 +640,6 @@ void webServerSetup() {
   server.on("/api/lift/up",   HTTP_POST, handleLiftUp);
   server.on("/api/lift/down", HTTP_POST, handleLiftDown);
   server.on("/api/lift/stop", HTTP_POST, handleLiftStop);
-  server.on("/api/fan/on",  HTTP_POST, handleFanOn);
-  server.on("/api/fan/off", HTTP_POST, handleFanOff);
   server.on("/api/system/estop",   HTTP_POST, handleEStop);
   server.on("/api/system/resume",  HTTP_POST, handleEStopResume);
   server.on("/api/system/restart", HTTP_POST, handleSystemRestart);
