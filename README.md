@@ -202,13 +202,13 @@ Cara mendapatkan MAC address PS3:
 - [X] Semua library sudah terinstall
 - [X] Board setting sudah sesuai tabel di atas
 - [X] MAC address PS3 sudah diset (bisa via WebServer setelah upload)
-- [ ] `display.h/.cpp` sudah diimplementasi → uncomment baris display di `Transporter.ino` dan `ps3_handler.cpp`
+- [X] `display.h/.cpp` sudah diimplementasi dan di uncomment
 - [X] Pin di `config.h` sudah sesuai dengan skema hardware
-- [X ] TB6612FNG STBY terhubung ke `PIN_MOTOR_STBY` (GPIO 23)
+- [X] TB6612FNG STBY terhubung ke `PIN_MOTOR_STBY` (GPIO 23)
 
 ---
 
-## 🔧 Troubleshooting
+## 🔧 Troubleshooting Software Side
 
 **Motor tidak bergerak sama sekali**
 → Cek pin `PIN_MOTOR_STBY` — harus HIGH agar TB6612FNG aktif
@@ -217,7 +217,7 @@ Cara mendapatkan MAC address PS3:
 → MAC address belum di-set atau salah — buka Web Dashboard tab PS3
 
 **Web Dashboard tidak bisa diakses**
-→ Pastikan terhubung ke WiFi `WIRAGORA_2024`, bukan WiFi lain
+→ Pastikan terhubung ke WiFi dari ESP32, bukan WiFi lain
 
 **Kompilasi error `undefined reference to showXxx()`**
 → `display_oled.cpp` belum diimplementasi — lihat checklist di atas
